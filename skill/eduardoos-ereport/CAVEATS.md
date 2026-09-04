@@ -6,12 +6,12 @@ Read this before Mode B/C.
 
 - A **sidecar folder** `.ereport/` in *your* project (clone of `eduardoos-ereport-connector`).
 - Plus a Cursor skill that teaches an agent to call Eduardo OS’s **public eReport API** with **your** key.
-- The CLI is intentionally thin: **API key + docs + generic request**. Agents learn endpoints and `.ereport` fields from `GET /api/v1/docs`.
-- Good for: opening/updating/extending issues from **any data the agent can parse**.
+- The CLI is intentionally thin: **API key + docs + generic request**. Agents must learn endpoints and write rules from `GET /api/v1/docs` **before every session/action**.
+- Good for: **adding** open issues from **any data the agent can parse**.
 
 ## What this is not
 
-- **Not** a PATCH API — every write is a **full payload replace**.
+- **Not** permission to edit existing issues via API — server **rejects** mutations to existing item ids (additive merge only).
 - **Not** key management (keys = **UI only**).
 - **Not** access to other people’s reports — **owned only**.
 - **Not** unlimited traffic — **60 req/min/key** (429 + `Retry-After`).
@@ -27,8 +27,8 @@ Read this before Mode B/C.
 
 ## Safety
 
-- Always **docs → get → merge → post**  
-- Preserve dates, `validationCriteria`, `criteriaStatus`, and unrelated items  
+- Always **docs → get → append new `reprobado` issues (with text) → post**  
+- Never change existing asuntos via API  
 - End with `Ver reporte: <viewUrl>`
 
 ## Liability

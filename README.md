@@ -2,7 +2,7 @@
 
 Silent sidecar for any project: clone this repo as **`.ereport/`** at your project root. Keeps your tree clean while agents sync Issue Tracker reports via the public API.
 
-**Design (docs-first):** the client stays thin — require an API key, fetch `GET /api/v1/docs`, then craft authenticated requests from the live catalog (`routes` + `payloadSchema`). Architecture changes land in the product docs; agents re-learn without connector churn.
+**Design (docs-first):** the client stays thin — require an API key, fetch `GET /api/v1/docs` **before any action**, then craft authenticated requests from the live catalog (`routes` + `payloadSchema`). API POST is **additive for issues** (server rejects edits to existing item ids). Architecture changes land in the product docs; agents re-learn without connector churn.
 
 ## Install (recommended)
 
