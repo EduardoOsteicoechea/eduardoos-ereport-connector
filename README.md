@@ -2,6 +2,8 @@
 
 Silent sidecar for any project: clone this repo as **`.ereport/`** at your project root. Keeps your tree clean while agents sync Issue Tracker reports via the public API.
 
+**Design (docs-first):** the client stays thin — require an API key, fetch `GET /api/v1/docs`, then craft authenticated requests from the live catalog (`routes` + `payloadSchema`). Architecture changes land in the product docs; agents re-learn without connector churn.
+
 ## Install (recommended)
 
 From your project root:
@@ -23,7 +25,7 @@ irm https://raw.githubusercontent.com/EduardoOsteicoechea/eduardoos-ereport-conn
 Then:
 
 ```bash
-cp .ereport/.env.example .ereport/.env   # edit: API key + org/report ids
+cp .ereport/.env.example .ereport/.env   # required: EDUARDOOS_API_KEY; org/report ids for edits
 ```
 
 **Consumer gitignore (suggested):**
@@ -31,6 +33,7 @@ cp .ereport/.env.example .ereport/.env   # edit: API key + org/report ids
 ```gitignore
 .ereport/.env
 .ereport/report.payload.json
+.ereport/docs.catalog.json
 ```
 
 Optional: ignore the whole `.ereport/` folder and clone per machine, or add it as a git submodule.
@@ -44,16 +47,23 @@ Installers copy them to `.cursor/skills/eduardoos-ereport/` so Cursor can load s
 
 Read **CAVEATS** before Mode B/C: `.ereport/skill/eduardoos-ereport/CAVEATS.md`
 
-## CLI
+## CLI (docs-first)
 
 ```bash
 cd .ereport
-python ereport_client.py access
-python ereport_client.py orgs
-python ereport_client.py org-reports
-python ereport_client.py get
-python ereport_client.py put --file report.payload.json
+# 1) Live catalog (no key) — always first
+python ereport_client.py docs
+
+# 2) Generic requests (key required except docs)
+python ereport_client.py request GET /api/v1/ereport/access
+python ereport_client.py request GET /api/v1/ereport/orgs
+python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports
+python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}
+# edit report.payload.json using payloadSchema from docs
+python ereport_client.py request POST /api/v1/ereport/orgs/{orgId}/reports/{reportId} --file report.payload.json
 ```
+
+Convenience aliases still work: `access`, `orgs`, `org-reports`, `get`, `put --file …`.
 
 Docs: https://eduardoos.com/api-docs  
 Catalog: https://eduardoos.com/api/v1/docs

@@ -6,6 +6,7 @@ Read this before Mode B/C.
 
 - A **sidecar folder** `.ereport/` in *your* project (clone of `eduardoos-ereport-connector`).
 - Plus a Cursor skill that teaches an agent to call Eduardo OS’s **public eReport API** with **your** key.
+- The CLI is intentionally thin: **API key + docs + generic request**. Agents learn endpoints and `.ereport` fields from `GET /api/v1/docs`.
 - Good for: opening/updating/extending issues from **any data the agent can parse**.
 
 ## What this is not
@@ -15,6 +16,7 @@ Read this before Mode B/C.
 - **Not** access to other people’s reports — **owned only**.
 - **Not** unlimited traffic — **60 req/min/key** (429 + `Retry-After`).
 - **Not** the same as a `*.ereport` report **file** — `.ereport/` is the connector **directory**.
+- **Not** a hardcoded schema — prefer live docs over this skill’s snapshots.
 
 ## Requirements
 
@@ -25,8 +27,8 @@ Read this before Mode B/C.
 
 ## Safety
 
-- Always **get → merge → put**  
-- Preserve dates and unrelated items  
+- Always **docs → get → merge → post**  
+- Preserve dates, `validationCriteria`, `criteriaStatus`, and unrelated items  
 - End with `Ver reporte: <viewUrl>`
 
 ## Liability
