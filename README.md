@@ -1,8 +1,15 @@
 # Eduardo OS eReport connector
 
-Silent sidecar for any project: clone this repo as **`.ereport/`** at your project root. Keeps your tree clean while agents sync Issue Tracker reports via the public API.
+Silent sidecar for any project: clone this repo as **`.ereport/`** at your project root. Keeps your tree clean while agents sync Issue Tracker reports via the public API and keep a **local execution log** under `.ereport/execution/`.
 
-**Design (docs-first):** the client stays thin — require an API key, fetch `GET /api/v1/docs` **before any action**, then craft authenticated requests from the live catalog (`routes` + `payloadSchema`). API POST is **additive for issues** (server rejects edits to existing item ids). Architecture changes land in the product docs; agents re-learn without connector churn.
+**Design (docs-first):** the client stays thin — require an API key, fetch `GET /api/v1/docs` **before any API action**, then craft authenticated requests from the live catalog (`routes` + `payloadSchema`).
+
+**POST modes (live docs):**
+
+- `mode: "append"` (default) — additive merge; new items need `incidencia` + `status: "reprobado"`; cannot edit existing ids.
+- `mode: "replace"` + `confirmOverwrite: true` — full seed bootstrap (mixed statuses).
+
+**Execution log:** local only. Runtime files under `.ereport/execution/` belong to the **consumer project**. They are gitignored in this upstream connector repo so host analytics are never pushed to [eduardoos-ereport-connector](https://github.com/EduardoOsteicoechea/eduardoos-ereport-connector).
 
 ## Install (recommended)
 
@@ -34,9 +41,10 @@ cp .ereport/.env.example .ereport/.env   # required: EDUARDOOS_API_KEY; org/repo
 .ereport/.env
 .ereport/report.payload.json
 .ereport/docs.catalog.json
+.ereport/execution_append_body.json
+# optional — keep execution history private, or commit it in YOUR repo:
+# .ereport/execution/
 ```
-
-Optional: ignore the whole `.ereport/` folder and clone per machine, or add it as a git submodule.
 
 > `.ereport/` is a **directory** (this connector). A `*.ereport` **file** is a report payload export — different things.
 
@@ -47,23 +55,32 @@ Installers copy them to `.cursor/skills/eduardoos-ereport/` so Cursor can load s
 
 Read **CAVEATS** before Mode B/C: `.ereport/skill/eduardoos-ereport/CAVEATS.md`
 
-## CLI (docs-first)
+## CLI (docs-first API)
 
 ```bash
 cd .ereport
-# 1) Live catalog (no key) — always first
 python ereport_client.py docs
-
-# 2) Generic requests (key required except docs)
 python ereport_client.py request GET /api/v1/ereport/access
-python ereport_client.py request GET /api/v1/ereport/orgs
-python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports
 python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}
-# edit report.payload.json using payloadSchema from docs
-python ereport_client.py request POST /api/v1/ereport/orgs/{orgId}/reports/{reportId} --file report.payload.json
+python ereport_client.py request POST /api/v1/ereport/orgs/{orgId}/reports/{reportId} --file body.json
 ```
 
-Convenience aliases still work: `access`, `orgs`, `org-reports`, `get`, `put --file …`.
+## Local execution log
+
+```bash
+cd .ereport
+python execution_log.py enable
+python execution_log.py identity --file identity.json   # last-executed wins
+python execution_log.py ingest --file run.json
+python execution_log.py status
+python execution_log.py digest --stream C20MCB-100 --step-id "CU 6.2.1"
+python execution_log.py to-ereport                     # writes execution_append_body.json
+# then POST append via ereport_client (docs first)
+```
+
+Read protocol: `last_status` → `identity` → `executions.index.json` → one run — never dump full DB into chat.
+
+Full schema: [EXECUTION_LOG.md](EXECUTION_LOG.md)
 
 Docs: https://eduardoos.com/api-docs  
 Catalog: https://eduardoos.com/api/v1/docs

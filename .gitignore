@@ -1,5 +1,13 @@
 .env
 report.payload.json
+docs.catalog.json
+execution_append_body.json
 __pycache__/
 *.pyc
 .DS_Store
+
+# Local execution ledger runtime (consumer project keeps this under its .ereport/)
+# Upstream connector must not receive host analytics.
+execution/*
+!execution/README.md
+!execution/.gitkeep

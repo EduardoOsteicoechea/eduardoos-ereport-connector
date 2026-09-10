@@ -1,21 +1,43 @@
 # eReport API reference (connector)
 
 **Source of truth:** `GET https://eduardoos.com/api/v1/docs` (no auth).  
-**Before any action:** run `python .ereport/ereport_client.py docs` and read `routes`, `agentGuidance`, and **`payloadSchema`**.
+**Before any API action:** run `python .ereport/ereport_client.py docs` and read `routes`, `agentGuidance`, and **`payloadSchema`**.
 
 Base default: `https://eduardoos.com`  
 Auth: `Authorization: Bearer eos_live_…` (required for all `/api/v1/ereport/*`)
 
-## Ordered flow (from catalog)
+## Ordered Issue Tracker flow
 
-1. `GET /api/v1/docs` — catalog + payloadSchema  
+1. `GET /api/v1/docs`  
 2. `GET /api/v1/ereport/access`  
 3. `GET /api/v1/ereport/orgs`  
 4. `GET /api/v1/ereport/orgs/{orgId}/reports`  
 5. `GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}` → `viewUrl`, `payload`  
-6. `POST /api/v1/ereport/orgs/{orgId}/reports/{reportId}`  
-   Body: `{ "confirmOverwrite": true, "payload": { /* stored + new open issues */ }, "tema"?: "…" }`  
-   Server **merges** additively (cannot change existing item ids).
+6. `POST` same URL with:
+
+```json
+{
+  "confirmOverwrite": true,
+  "mode": "append",
+  "tema": "optional",
+  "payload": {}
+}
+```
+
+| mode | Behavior |
+|------|----------|
+| `append` (default) | Merge only; existing ids immutable; new items = non-empty `incidencia` + `status: "reprobado"` |
+| `replace` | Full payload replace; requires `confirmOverwrite: true`; mixed statuses OK |
+
+## Local execution log (not on Eduardo OS API)
+
+Under `.ereport/execution/` in the **consumer** project:
+
+```bash
+python .ereport/execution_log.py enable|status|identity|ingest|index|digest|to-ereport
+```
+
+See `EXECUTION_LOG.md`. Do not upload the ledger to the connector development remote.
 
 ## Thin CLI
 
@@ -24,16 +46,7 @@ python .ereport/ereport_client.py docs
 python .ereport/ereport_client.py request METHOD /path [--file body.json]
 ```
 
-## Payload (summary — prefer catalog.payloadSchema)
-
-Root: `orgName`, `reportName`, `appTitle`, `reportDate`, `reportNumber`,
-`validationCriteria[]`, `theme`, `sections[]`.
-
-Item: `id`, `nombre`, `incidencia`, `solucion`, dates, images,
-`status`, `criteriaStatus`.
-
-**New API items:** `incidencia` non-empty + `status: "reprobado"`.  
-**Existing items:** do not modify (400).
+Bare `.ereport` payload files auto-wrap as `{confirmOverwrite:true, payload:…}` on report POST (still defaults to append unless the JSON includes `"mode":"replace"`).
 
 ## viewUrl
 

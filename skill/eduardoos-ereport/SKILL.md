@@ -2,10 +2,11 @@
 name: eduardoos-ereport
 description: >-
   Sync Eduardo OS eReport org reports via the public rate-limited API: open or
-  edit issues on the website, get/put full payloads with an API key, and ingest
-  any parseable complaints document into sections/groups/items. Use when the
-  user mentions eReport, Issue Tracker, .ereport connector, eos_live_ keys,
-  org reports, or mapping QA/quejas into a remote report.
+  edit issues on the website, get/post payloads with an API key (append or
+  replace), keep a local execution log under .ereport/execution/, and map
+  fail/review evidence into reprobado append bodies. Use when the user mentions
+  eReport, Issue Tracker, .ereport connector, eos_live_ keys, org reports,
+  execution log, or mapping QA/quejas into a remote report.
 disable-model-invocation: true
 ---
 
@@ -14,69 +15,61 @@ disable-model-invocation: true
 **Install location:** project sidecar **`.ereport/`** (this connector repo).  
 **Before first run:** read [CAVEATS.md](CAVEATS.md).  
 **Live API contract:** always `GET /api/v1/docs` first (see [reference.md](reference.md)).  
-**CLI:** `.ereport/ereport_client.py` (from project root: `python .ereport/ereport_client.py …`).
+**CLI:** `.ereport/ereport_client.py` · **Local log:** `.ereport/execution_log.py`  
+**Spec:** `.ereport/EXECUTION_LOG.md`
 
 Repo: https://github.com/EduardoOsteicoechea/eduardoos-ereport-connector  
 Docs: https://eduardoos.com/api-docs
 
 ## When to use
 
-- Add **new open issues** to an **owned** org report from chat, files, or pasted data
-- Wire a repo agent to docs-driven access → orgs → reports → get → additive post
-- Ingest QA/complaints docs as **new** `reprobado` items (never rewrite existing ones)
+- Add **new open issues** (`append`) or bootstrap a full seed (`replace`)
+- Keep agent/CI run evidence in **`.ereport/execution/`** (consumer project)
+- Map `fail|review` steps → append POST body (`to-ereport`) then remote POST
 
 ## Modes (pick one)
 
 | Mode | Use when |
 |------|----------|
 | **A** | Report not open yet — guide human on the website |
-| **B** | Sync via API key (docs → get → append new issues → post) |
-| **C** | Parse any complaints source → append open issues → post |
-
-If the report is not open on the site: **Mode A first**, then B or C.
-
-### Mode A (non-technical)
-
-1. Sign in at https://eduardoos.com  
-2. Open eReport → organization → report (or create one)  
-3. Copy **Org ID** + **Report ID**  
-4. Create API key only in UI: `/auth/profile` or `/api-keys`  
-5. Put key + ids in `.ereport/.env` (gitignored). Say “report is open”.
+| **B** | Sync via API key (docs → get → append or replace → post) |
+| **C** | Parse complaints → append open issues → post |
+| **D** | Local execution log (enable → ingest → digest → optional to-ereport) |
 
 ### Mode B (API — docs first)
 
 ```bash
-# Required: EDUARDOOS_API_KEY in .ereport/.env
 python .ereport/ereport_client.py docs
-# Read docs.catalog.json → payloadSchema.writeSemantics (additive POST)
+# Read docs.catalog.json → payloadSchema.writeSemantics + modes
 python .ereport/ereport_client.py request GET /api/v1/ereport/access
-python .ereport/ereport_client.py request GET /api/v1/ereport/orgs
-python .ereport/ereport_client.py request GET /api/v1/ereport/orgs/$ORG/reports
 python .ereport/ereport_client.py request GET /api/v1/ereport/orgs/$ORG/reports/$REPORT
-# Append ONLY new items (status reprobado + non-empty incidencia). Do not change existing item ids.
-python .ereport/ereport_client.py request POST /api/v1/ereport/orgs/$ORG/reports/$REPORT --file .ereport/report.payload.json
+# append (default): new items only, status reprobado
+# replace: full seed — confirmOverwrite true + "mode":"replace"
+python .ereport/ereport_client.py request POST /api/v1/ereport/orgs/$ORG/reports/$REPORT --file .ereport/body.json
 ```
 
-### Mode C
+### Mode D (local execution log)
 
-1. Confirm org/report (Mode A if needed).  
-2. `docs` then GET current payload.  
-3. Parse user data; create **new** item ids with `status: reprobado` and non-empty `incidencia`.  
-4. **Never edit/delete existing issues** — server returns 400.  
-5. POST; print open ids + `Ver reporte: <viewUrl>`.
+```bash
+python .ereport/execution_log.py enable
+python .ereport/execution_log.py identity --file identity.json
+python .ereport/execution_log.py ingest --file run.json
+python .ereport/execution_log.py digest --stream … --step-id …
+python .ereport/execution_log.py to-ereport
+# POST append body with ereport_client — never auto-close via append
+```
+
+**Read order:** `last_status.txt` → `identity.json` → `executions.index.json` → one run. Never load full `executions.json` into chat first.
+
+Runtime files stay in the **host project’s** `.ereport/execution/`. Do not push them to the connector upstream repo.
 
 ## Hard rules
 
 1. Never print the API key.  
-2. **Always `docs` before any other API call** — schema evolves.  
-3. API POST is **additive for issues** (server merge). Cannot modify existing asuntos.  
-4. New issues: non-empty `incidencia` + `status: "reprobado"`.  
-5. Honor **60 req/min/key**.  
-6. End with `Ver reporte: <viewUrl>`.
-
-## Host-repo install (cleanest)
-
-```bash
-git clone --depth 1 https://github.com/EduardoOsteicoechea/eduardoos-ereport-connector.git .ereport
-# wire skill into .cursor/skills/eduardoos-ereport (see install.sh / install.ps1)
-```
+2. **Always `docs` before any other API call.**  
+3. Default POST **`append`**: cannot modify existing item ids; new items need `incidencia` + `reprobado`.  
+4. **`replace`** only for explicit full sync + `confirmOverwrite: true`.  
+5. Append **cannot** close issues (`reprobado` → `aprobado`).  
+6. Honor **60 req/min/key**.  
+7. End API writes with `Ver reporte: <viewUrl>`.  
+8. Execution log IO failures must not abort host work (fail-soft).

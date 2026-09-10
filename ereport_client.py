@@ -152,7 +152,7 @@ def cmd_request(args: argparse.Namespace) -> None:
             and "confirmOverwrite" not in raw
             and "payload" not in raw
         ):
-            body = {"confirmOverwrite": True, "payload": raw}
+            body = {"confirmOverwrite": True, "mode": "append", "payload": raw}
         else:
             body = raw
     auth = path not in ("/api/v1/docs",) and not path.rstrip("/").endswith("/api/v1/docs")
@@ -213,9 +213,13 @@ def cmd_put(args: argparse.Namespace) -> None:
         sys.exit(2)
     path = Path(args.file)
     payload = json.loads(path.read_text(encoding="utf-8"))
-    body = {"confirmOverwrite": True, "payload": payload}
+    mode = (args.mode or "append").strip().lower()
+    if mode not in ("append", "replace"):
+        print("mode must be append or replace", file=sys.stderr)
+        sys.exit(2)
+    body = {"confirmOverwrite": True, "mode": mode, "payload": payload}
     out = request("POST", f"/api/v1/ereport/orgs/{c['org']}/reports/{c['report']}", body)
-    print(json.dumps({"snapshotId": out.get("snapshotId"), "tema": (out.get("meta") or {}).get("tema")}, indent=2))
+    print(json.dumps({"snapshotId": out.get("snapshotId"), "mode": mode, "tema": (out.get("meta") or {}).get("tema")}, indent=2))
     print_view(out)
 
 
@@ -240,6 +244,7 @@ def main() -> None:
     sub.add_parser("get").set_defaults(func=cmd_get)
     put = sub.add_parser("put")
     put.add_argument("--file", required=True, help="JSON file with full .ereport payload object")
+    put.add_argument("--mode", default="append", choices=["append", "replace"], help="POST mode (default append)")
     put.set_defaults(func=cmd_put)
 
     args = p.parse_args()
