@@ -25,10 +25,27 @@ from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parent
 EXEC_DIR = ROOT / "execution"
+CONSENT_PATH = EXEC_DIR / "execution.consent.json"
 SCHEMA_VERSION = 1
 MAX_RUNS_PER_STREAM = 50
 MAX_MESSAGES_PER_STEP = 500
 STATUS_OK = frozenset({"pass", "fail", "review", "skipped", "error"})
+
+# Shown by agents before asking the user to accept/reject logging.
+CONSENT_PROMPT = """\
+eReport execution logging (optional extension)
+----------------------------------------------
+If you ACCEPT, this project will keep a detailed local ledger under
+.ereport/execution/ (identity, runs, index, digests). The agent must then
+log work in that ledger (fail-soft) and may map fail/review → eReport append.
+Data stays in YOUR project’s .ereport/; it is not uploaded to the connector
+upstream repo and is separate from the Issue Tracker API.
+
+If you REJECT, the agent will NOT enable the ledger. It may still sync the
+Issue Tracker report via the API (append/replace) using its own workflow.
+
+Reply clearly: ACCEPT logging  |  REJECT logging
+"""
 
 
 def _utc_now() -> str:
@@ -85,18 +102,81 @@ def _slug(s: str) -> str:
     return out[:48] or "step"
 
 
+def consent_state() -> str:
+    """Return accepted | rejected | unset."""
+    data = _read_json(CONSENT_PATH, {})
+    if not isinstance(data, dict):
+        return "unset"
+    choice = str(data.get("logging") or "").strip().lower()
+    if choice in ("accepted", "rejected"):
+        return choice
+    return "unset"
+
+
+def write_consent(choice: str, note: str = "") -> dict[str, Any]:
+    choice = choice.strip().lower()
+    if choice not in ("accepted", "rejected"):
+        raise ValueError("choice must be accepted or rejected")
+    EXEC_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "logging": choice,
+        "decided_at_utc": _utc_now(),
+        "note": (note or "").strip(),
+        "prompt_version": 1,
+    }
+    _write_json(CONSENT_PATH, payload)
+    if choice == "rejected":
+        cfg_path = EXEC_DIR / "execution.config.json"
+        cfg = _read_json(cfg_path, {})
+        if not isinstance(cfg, dict):
+            cfg = {}
+        cfg["enabled"] = False
+        _write_json(cfg_path, cfg)
+        flag = EXEC_DIR / "execution.enabled"
+        if flag.is_file():
+            try:
+                flag.unlink()
+            except OSError:
+                pass
+        write_last_status(f"{_utc_now()} reason=disabled consent=rejected")
+    return payload
+
+
 def ensure_enabled() -> bool:
+    if consent_state() == "rejected":
+        return False
+    if consent_state() != "accepted":
+        return False
     flag = EXEC_DIR / "execution.enabled"
     cfg = _read_json(EXEC_DIR / "execution.config.json", {})
     if flag.is_file():
         return True
     if isinstance(cfg, dict) and cfg.get("enabled") is True:
         return True
-    # Default ON when consumers use the log CLI explicitly; fail-soft hosts can
-    # set enabled:false. Empty dir without config still accepts ingest.
     if isinstance(cfg, dict) and cfg.get("enabled") is False:
         return False
-    return True
+    return False
+
+
+def require_accepted_consent() -> None:
+    state = consent_state()
+    if state == "accepted":
+        return
+    if state == "rejected":
+        print(
+            "Execution logging was REJECTED by the user. "
+            "Do not enable the ledger; sync eReport without detailed logging.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+    print(CONSENT_PROMPT, file=sys.stderr)
+    print(
+        "No consent on file. Ask the user to ACCEPT or REJECT, then run:\n"
+        "  python execution_log.py accept\n"
+        "  python execution_log.py reject",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
 
 def write_last_status(line: str) -> None:
@@ -277,7 +357,29 @@ def map_fail_to_items(run: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def cmd_prompt(_: argparse.Namespace) -> None:
+    print(CONSENT_PROMPT)
+    print(json.dumps({"consent": consent_state(), "path": str(CONSENT_PATH)}, indent=2))
+
+
+def cmd_accept(args: argparse.Namespace) -> None:
+    out = write_consent("accepted", note=getattr(args, "note", "") or "")
+    print(json.dumps(out, indent=2))
+    print("Next: python execution_log.py enable")
+
+
+def cmd_reject(args: argparse.Namespace) -> None:
+    out = write_consent("rejected", note=getattr(args, "note", "") or "")
+    print(json.dumps(out, indent=2))
+    print("Logging rejected — agent must sync eReport without the execution ledger.")
+
+
+def cmd_consent(_: argparse.Namespace) -> None:
+    print(json.dumps({"consent": consent_state(), "detail": _read_json(CONSENT_PATH, {})}, indent=2, ensure_ascii=False))
+
+
 def cmd_enable(_: argparse.Namespace) -> None:
+    require_accepted_consent()
     EXEC_DIR.mkdir(parents=True, exist_ok=True)
     (EXEC_DIR / "execution.enabled").write_text("", encoding="utf-8")
     cfg_path = EXEC_DIR / "execution.config.json"
@@ -288,18 +390,19 @@ def cmd_enable(_: argparse.Namespace) -> None:
     cfg.setdefault("max_runs_per_stream", MAX_RUNS_PER_STREAM)
     cfg.setdefault("max_messages_per_step", MAX_MESSAGES_PER_STEP)
     _write_json(cfg_path, cfg)
-    write_last_status(f"{_utc_now()} reason=ok enabled")
-    print(json.dumps({"enabled": True, "root": str(EXEC_DIR)}, indent=2))
+    write_last_status(f"{_utc_now()} reason=ok enabled consent=accepted")
+    print(json.dumps({"enabled": True, "consent": "accepted", "root": str(EXEC_DIR)}, indent=2))
 
 
 def cmd_status(_: argparse.Namespace) -> None:
     path = EXEC_DIR / "last_status.txt"
     line = path.read_text(encoding="utf-8").strip() if path.is_file() else ""
-    print(line or "reason=no_session")
+    print(json.dumps({"consent": consent_state(), "last_status": line or "reason=no_session"}, indent=2))
 
 
 def cmd_identity(args: argparse.Namespace) -> None:
     if args.file:
+        require_accepted_consent()
         identity = json.loads(Path(args.file).read_text(encoding="utf-8"))
         out = publish_identity(identity)
         print(json.dumps(out, indent=2, ensure_ascii=False))
@@ -312,6 +415,7 @@ def cmd_identity(args: argparse.Namespace) -> None:
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
+    require_accepted_consent()
     run = json.loads(Path(args.file).read_text(encoding="utf-8"))
     if "execution" in run and isinstance(run["execution"], dict):
         run = run["execution"]
@@ -375,6 +479,7 @@ def cmd_digest(args: argparse.Namespace) -> None:
 
 
 def cmd_to_ereport(args: argparse.Namespace) -> None:
+    require_accepted_consent()
     db = load_db()
     run = None
     if args.execution_id:
@@ -427,8 +532,17 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Local .ereport execution log (agent analytics)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("enable", help="Create execution.enabled + config under .ereport/execution/").set_defaults(func=cmd_enable)
-    sub.add_parser("status", help="Print last_status.txt").set_defaults(func=cmd_status)
+    sub.add_parser("prompt", help="Print the user consent prompt (agents must show this first)").set_defaults(func=cmd_prompt)
+    acc = sub.add_parser("accept", help="Record user ACCEPT of detailed execution logging")
+    acc.add_argument("--note", default="")
+    acc.set_defaults(func=cmd_accept)
+    rej = sub.add_parser("reject", help="Record user REJECT — agent syncs eReport without ledger")
+    rej.add_argument("--note", default="")
+    rej.set_defaults(func=cmd_reject)
+    sub.add_parser("consent", help="Show consent state").set_defaults(func=cmd_consent)
+
+    sub.add_parser("enable", help="Enable ledger (requires prior accept)").set_defaults(func=cmd_enable)
+    sub.add_parser("status", help="Print consent + last_status").set_defaults(func=cmd_status)
 
     idp = sub.add_parser("identity", help="Show or publish identity.json (last-executed wins)")
     idp.add_argument("--file", help="JSON identity to publish")

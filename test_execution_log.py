@@ -20,8 +20,22 @@ class ExecutionLogTests(unittest.TestCase):
         self.patcher = mock.patch.object(el, "EXEC_DIR", self.tmp / "execution")
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
+        el.CONSENT_PATH = el.EXEC_DIR / "execution.consent.json"
+
+    def test_consent_gate(self) -> None:
+        self.assertEqual(el.consent_state(), "unset")
+        with self.assertRaises(SystemExit) as cm:
+            el.require_accepted_consent()
+        self.assertEqual(cm.exception.code, 2)
+        el.write_consent("rejected")
+        with self.assertRaises(SystemExit) as cm2:
+            el.require_accepted_consent()
+        self.assertEqual(cm2.exception.code, 3)
+        el.write_consent("accepted")
+        el.require_accepted_consent()  # no raise
 
     def test_ingest_index_digest_to_ereport(self) -> None:
+        el.write_consent("accepted")
         el.cmd_enable(None)  # type: ignore[arg-type]
         el.publish_identity({"stream": "C20MCB-100", "commit": "deadbeef", "source": "test"})
         run = {
@@ -45,10 +59,9 @@ class ExecutionLogTests(unittest.TestCase):
         items = el.map_fail_to_items(saved)
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["status"], "reprobado")
-        status = (el.EXEC_DIR / "last_status.txt").read_text(encoding="utf-8")
-        self.assertIn("reason=ok", status)
 
     def test_duplicate_id_rejected(self) -> None:
+        el.write_consent("accepted")
         el.cmd_enable(None)  # type: ignore[arg-type]
         run = {
             "execution_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

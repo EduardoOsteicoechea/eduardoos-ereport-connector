@@ -9,7 +9,8 @@ Silent sidecar for any project: clone this repo as **`.ereport/`** at your proje
 - `mode: "append"` (default) — additive merge; new items need `incidencia` + `status: "reprobado"`; cannot edit existing ids.
 - `mode: "replace"` + `confirmOverwrite: true` — full seed bootstrap (mixed statuses).
 
-**Execution log:** local only. Runtime files under `.ereport/execution/` belong to the **consumer project**. They are gitignored in this upstream connector repo so host analytics are never pushed to [eduardoos-ereport-connector](https://github.com/EduardoOsteicoechea/eduardoos-ereport-connector).
+**Execution log (optional):** local only, under `.ereport/execution/`. Agents **must ask the user to ACCEPT or REJECT** before `enable`. Accept → detailed ledger becomes a standing agent rule. Reject → sync the Issue Tracker without that ledger. Runtime files belong to the **consumer project** and are gitignored in this upstream connector repo.
+
 
 ## Install (recommended)
 
@@ -69,13 +70,14 @@ python ereport_client.py request POST /api/v1/ereport/orgs/{orgId}/reports/{repo
 
 ```bash
 cd .ereport
-python execution_log.py enable
-python execution_log.py identity --file identity.json   # last-executed wins
+python execution_log.py prompt          # show consent text to the user first
+python execution_log.py accept          # or: reject
+python execution_log.py enable          # only after accept
+python execution_log.py identity --file identity.json
 python execution_log.py ingest --file run.json
 python execution_log.py status
 python execution_log.py digest --stream C20MCB-100 --step-id "CU 6.2.1"
-python execution_log.py to-ereport                     # writes execution_append_body.json
-# then POST append via ereport_client (docs first)
+python execution_log.py to-ereport
 ```
 
 Read protocol: `last_status` → `identity` → `executions.index.json` → one run — never dump full DB into chat.
