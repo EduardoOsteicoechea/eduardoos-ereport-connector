@@ -24,7 +24,7 @@ Live eReport API contract: always `GET https://eduardoos.com/api/v1/docs` (prefe
 
 ## 1. Design principles (non-negotiable)
 
-1. **Opt-in.** Logging off by default unless config/flag enables it (or the host product chooses always-on for QA builds).
+1. **Opt-in + user consent.** Logging is off until the user **ACCEPT**s (`execution_log.py accept` → `enable`). Agents must show the consent prompt and wait. **REJECT** means no ledger; the agent may still sync the Issue Tracker without detailed logging. Never enable silently.
 2. **Fail-soft.** Logging must never abort the primary work (verification, agent task, build). IO errors → status file, continue.
 3. **Identity = last executed wins.** The identity of the *process that ran* beats any shared “install stamp” sitting on disk with a newer timestamp.
 4. **Index-first reads.** Agents must not load the full run DB into context. Read status → index → filtered runs → open artifacts on demand.
@@ -587,7 +587,9 @@ Deliverables:
 
 ## 12. Acceptance criteria for “agents can see themselves and update eReport”
 
-- [ ] Agent can enable local logging via flag/config without code changes.
+- [ ] Agent shows consent prompt and records ACCEPT or REJECT before any `enable`.
+- [ ] ACCEPT → agent can enable local logging; standing rules include detailed ledger ingest/digest.
+- [ ] REJECT → no ledger; agent may still sync eReport via API without execution logging.
 - [ ] After a run, `last_status` shows `ok` with `execution_id`.
 - [ ] Index answers “last status for step_id under stream” without full DB load.
 - [ ] Digest ≤15 lines produced from index + one run slice.
