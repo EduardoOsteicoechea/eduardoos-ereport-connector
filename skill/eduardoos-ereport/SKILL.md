@@ -3,10 +3,11 @@ name: eduardoos-ereport
 description: >-
   Sync Eduardo OS eReport org reports via the public rate-limited API: open or
   edit issues on the website, get/post payloads with an API key (append or
-  replace). Optional local execution ledger under .ereport/execution/ requires
-  explicit user ACCEPT before enable. Use when the user mentions eReport,
-  Issue Tracker, .ereport connector, eos_live_ keys, org reports, execution
-  log, or mapping QA/quejas into a remote report.
+  replace). Website-registration binding for the site Connector / quick modal.
+  Optional local execution ledger under .ereport/execution/ requires explicit
+  user ACCEPT before enable. Use when the user mentions eReport, Issue Tracker,
+  .ereport connector, eos_live_ keys, website registration, org reports,
+  execution log, or mapping QA/quejas into a remote report.
 disable-model-invocation: true
 ---
 
@@ -20,6 +21,17 @@ disable-model-invocation: true
 
 Repo: https://github.com/EduardoOsteicoechea/eduardoos-ereport-connector  
 Docs: https://eduardoos.com/api-docs
+
+## Website registration binding (site Connector)
+
+Documented in live `GET /api/v1/docs` → `payloadSchema.ereport.websiteRegistration` and `webConnector.features`.
+
+1. Hub: create report with purpose **Website registration** (one per owner; default **Other**).
+2. Cookie `GET /api/ereport/access` → `websiteRegistration: { orgId, reportId, tema } | null`.
+3. eduardoos.com chrome: menu **Connector** + header **bug_report** (left of the menu opener) only with entitlement + binding → **quick issue modal** (add-only; nombre until first `.`).
+4. Quick modal **settings** (gear) opens a settings dialog: default section + subsection in `localStorage` (`ereport.connector.defaults`); **Advanced** → `/ereport/web-connector` (save alerts).
+5. `.ereport/.env`: `EDUARDOOS_ORG_ID` / `EDUARDOOS_REPORT_ID` = that report. API still allows all owned reports; UI locks to the binding.
+6. Without binding: Connector / bug button hidden; use hub + local `.ereport` file (dev reporting).
 
 ## Mandatory: execution-logging consent (before Mode D)
 
@@ -57,6 +69,28 @@ Never enable logging silently. Never imply REJECT blocks eReport API sync.
 | **B** | Sync via API key (docs → get → append or replace → post) |
 | **C** | Parse complaints → append open issues → post |
 | **D** | Local execution log — **only after user ACCEPT** |
+| **W** | Web project — mount `https://eduardoos.com/ereport/embed.js` with website-registration org/report |
+| **S** | Site shell on eduardoos.com — Connector / bug_report → quick modal (see Website registration) |
+
+### Mode W (web embed)
+
+```html
+<link rel="stylesheet" href="https://eduardoos.com/ereport/embed-theme.css" />
+<script src="https://eduardoos.com/ereport/embed.js"></script>
+<script>
+  EduardoOSEreport.mount({
+    orgId: "WEBSITE_REGISTRATION_ORG_ID",
+    reportId: "WEBSITE_REGISTRATION_REPORT_ID",
+    menuSelector: "#main-menu nav",
+    label: "eReport",
+    baseUrl: "https://eduardoos.com"
+  });
+</script>
+```
+
+Opens `/ereport/web-connector` in an iframe (session + subscription; no API key). Prefer the website_registration ids. Granular `POST`/`PATCH` section/group/item routes (see live docs).
+
+**Theme:** override `--eos-ereport-*` from `embed-theme.css` and style `.eos-ereport-embed-menu-btn` like the host nav. Default chrome is intentional fallback only — each site should make it look native.
 
 ### Mode B (API — docs first)
 

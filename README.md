@@ -9,6 +9,10 @@ Silent sidecar for any project: clone this repo as **`.ereport/`** at your proje
 - `mode: "append"` (default) — additive merge; new items need `incidencia` + `status: "reprobado"`; cannot edit existing ids.
 - `mode: "replace"` + `confirmOverwrite: true` — full seed bootstrap (mixed statuses).
 
+**Web projects:** mount `https://eduardoos.com/ereport/embed.js` — adds a host menu control and opens `/ereport/web-connector` (session + eReport subscription; no API key in the browser). Prefer the owner’s **website registration** org/report ids.
+
+**eduardoos.com shell:** with eReport entitlement + a website-registration report, the main menu **Connector** and header **bug_report** (left of the menu opener) open the quick issue modal. The gear opens a **settings** dialog (default section/subsection in `localStorage`); Advanced opens the full web connector. CLI below stays unchanged.
+
 **Execution log (optional):** local only, under `.ereport/execution/`. Agents **must ask the user to ACCEPT or REJECT** before `enable`. Accept → detailed ledger becomes a standing agent rule. Reject → sync the Issue Tracker without that ledger. Runtime files belong to the **consumer project** and are gitignored in this upstream connector repo.
 
 
