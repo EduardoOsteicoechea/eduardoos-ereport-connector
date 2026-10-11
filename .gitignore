@@ -2,6 +2,7 @@
 report.payload.json
 docs.catalog.json
 execution_append_body.json
+tmp/
 __pycache__/
 *.pyc
 .DS_Store

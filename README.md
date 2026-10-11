@@ -68,7 +68,15 @@ python ereport_client.py docs
 python ereport_client.py request GET /api/v1/ereport/access
 python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}
 python ereport_client.py request POST /api/v1/ereport/orgs/{orgId}/reports/{reportId} --file body.json
+
+# Issue images (API key only — not cookie /api/ereport/…/images)
+python ereport_client.py upload-image --file ./shot.png
+# or: request POST …/images --upload ./shot.png  → prints {id,url,mime,name}
+python ereport_client.py request GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}/images/{imageId} --out ./tmp/incidencia.jpg
+# or: download-image {imageId} --out ./tmp/incidencia.jpg
 ```
+
+Attach returned `id`/`url` on item `imagesIncidencia` / `imagesSolucion` / `images` before PATCH item or append. GET report rewrites image URLs to v1 paths for agents.
 
 ## Local execution log
 

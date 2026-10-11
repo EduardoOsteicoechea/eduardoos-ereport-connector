@@ -55,6 +55,22 @@ Live catalog keys: `payloadSchema.ereport.websiteRegistration`, `payloadSchema.e
 
 Same paths under cookie `/api/ereport/...` for the site UI.
 
+### Issue images (API key)
+
+Live catalog: `payloadSchema.ereport.images` + routes:
+
+- `POST /api/v1/ereport/orgs/{orgId}/reports/{reportId}/images` — multipart field `file` (png|jpeg|webp) → `{id,url,mime,name}`
+- `GET /api/v1/ereport/orgs/{orgId}/reports/{reportId}/images/{imageId}` — raw bytes (`Cache-Control: private, no-store`)
+
+```bash
+python .ereport/ereport_client.py upload-image --file ./shot.png
+python .ereport/ereport_client.py request GET \
+  /api/v1/ereport/orgs/{orgId}/reports/{reportId}/images/{imageId} \
+  --out .ereport/tmp/{imageId}.jpg
+```
+
+Attach `id`/`url` on `imagesIncidencia` / `imagesSolucion` / `images`. GET report rewrites image URLs to v1 for agents. Cookie image routes stay for the browser UI only.
+
 ### Web embed
 
 - Loader: `https://eduardoos.com/ereport/embed.js`
@@ -78,7 +94,9 @@ See `EXECUTION_LOG.md` and skill **Mandatory: execution-logging consent**.
 
 ```bash
 python .ereport/ereport_client.py docs
-python .ereport/ereport_client.py request METHOD /path [--file body.json]
+python .ereport/ereport_client.py request METHOD /path [--file body.json | --upload file] [--out path]
+python .ereport/ereport_client.py upload-image --file ./shot.png
+python .ereport/ereport_client.py download-image {imageId} --out ./tmp/shot.jpg
 ```
 
 `viewUrl`: `{BASE}/ereport/workspace?user={ownerSafe}&org={orgId}&report={reportId}`

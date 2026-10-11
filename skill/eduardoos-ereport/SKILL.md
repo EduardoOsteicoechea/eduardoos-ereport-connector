@@ -101,6 +101,23 @@ python .ereport/ereport_client.py request GET /api/v1/ereport/orgs/$ORG/reports/
 python .ereport/ereport_client.py request POST /api/v1/ereport/orgs/$ORG/reports/$REPORT --file .ereport/body.json
 ```
 
+### Mode I (issue images — website screenshots / attach)
+
+Agents use **v1 API-key** image routes only (cookie `/api/ereport/…/images` returns 401 without a browser session).
+
+```bash
+python .ereport/ereport_client.py docs   # must list POST+GET …/images
+# Download incidencia screenshot before coding:
+python .ereport/ereport_client.py request GET \
+  /api/v1/ereport/orgs/$ORG/reports/$REPORT/images/$IMAGE_ID \
+  --out .ereport/tmp/$IMAGE_ID.jpg
+# Upload then attach on item:
+python .ereport/ereport_client.py upload-image --file ./shot.png
+# → put {id,url,mime} into imagesIncidencia | imagesSolucion | images, then PATCH item
+```
+
+Never use cookie image URLs without a session. Do not commit `.ereport/tmp/` binaries or `.env`.
+
 ### Mode D (local execution log — consent first)
 
 ```bash
